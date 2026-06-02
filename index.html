@@ -1480,6 +1480,54 @@ const SEOUL_TOURS = [
       {name:'Insadong Craft Shop',meta:'Traditional toys · Indoor',mission:'👆 Touch: Spin the top (paeng-i)!',icon:'🎎',walkMin:10,pts:60,status:'next',lat:37.5725,lng:126.9854},
       {name:'Jogyesa Temple Garden',meta:'500-year-old tree · GPS',mission:'🌳 Touch: Hug the ancient pine tree!',icon:'🪷',walkMin:12,pts:60,status:'next',lat:37.5744,lng:126.9817},
     ]
+  },
+  {
+    id:'tp6',
+    name:'Seochon: The Artists\' Alleys',
+    tag:'Hidden Gem',
+    tagColor:'var(--gold)',
+    tagBg:'var(--gold-dim)',
+    img:'https://picsum.photos/id/1031/600/300',
+    desc:'West of Gyeongbokgung lies Seochon — once home to Joseon-era middle-class artisans, later to painters and poets like Yi Sang and Yun Dong-ju. A quieter, lived-in counterpart to Bukchon, full of art studios, old bakeries, and a hidden valley below Inwangsan.',
+    duration:'~2 hours',
+    distance:'2.8km',
+    spots:['Daelim Museum','Tongin Market','Bak Noksu House Museum','Suseong-dong Valley','Yun Dong-ju Hill'],
+    spotIds:[],
+    totalPts:430,
+    reward:'🎨 Seochon Artist Trail Badge + Tongin Market yeopjeon coupon',
+    color:'var(--gold)',
+    custom:true,
+    steps:[
+      {name:'Daelim Museum',meta:'Korea\'s first photography museum · GPS',mission:'🧠 Quiz: What was this building before?',icon:'📷',walkMin:0,pts:80,status:'now',lat:37.5778,lng:126.9730},
+      {name:'Tongin Market',meta:'Yeopjeon lunchbox market · GPS',mission:'🪙 Touch: Trade brass coins for banchan',icon:'🍱',walkMin:8,pts:90,status:'next',lat:37.5805,lng:126.9700},
+      {name:'Bak Noksu House Museum',meta:'1937 hanok-Western villa · Indoor AR',mission:'📸 AR: Scan the painter\'s studio',icon:'🖼️',walkMin:7,pts:90,status:'next',lat:37.5829,lng:126.9676},
+      {name:'Suseong-dong Valley',meta:'Inwangsan hidden valley · GPS',mission:'📸 Photo: Frame the Jeong Seon landscape',icon:'⛰️',walkMin:9,pts:90,status:'next',lat:37.5836,lng:126.9656},
+      {name:'Yun Dong-ju Hill',meta:'Poet\'s boarding-house site · GPS',mission:'📳 Shake: Recall the poet\'s verse',icon:'✒️',walkMin:11,pts:80,status:'next',lat:37.5847,lng:126.9667},
+    ]
+  },
+  {
+    id:'tp7',
+    name:'Bukchon: 600 Years of Hanok',
+    tag:'Classic',
+    tagColor:'var(--blue)',
+    tagBg:'var(--blue-dim)',
+    img:'https://picsum.photos/id/1037/600/300',
+    desc:'Set between Gyeongbokgung and Changdeokgung, Bukchon was the Joseon aristocracy\'s residential quarter. Today its packed hanok rooftops, craft workshops and the famous Bukchon 8 Views make it Seoul\'s most beloved traditional village — a living street museum where residents still call home.',
+    duration:'~2 hours',
+    distance:'2.4km',
+    spots:['Bukchon Culture Center','Baek In-je House','Gahoe-dong 31 Viewpoint','Bukchon Craft Alley','Samcheong-dong'],
+    spotIds:[],
+    totalPts:420,
+    reward:'🏘️ Bukchon Hanok Master Badge + craft workshop voucher',
+    color:'var(--blue)',
+    custom:true,
+    steps:[
+      {name:'Bukchon Culture Center',meta:'Hanok info & tea · Indoor',mission:'🍵 Touch: Pour a cup of traditional tea',icon:'🏛️',walkMin:0,pts:70,status:'now',lat:37.5824,lng:126.9858},
+      {name:'Baek In-je House',meta:'1913 modern hanok estate · Indoor AR',mission:'📸 AR: Scan the sarangchae courtyard',icon:'🏯',walkMin:6,pts:90,status:'next',lat:37.5818,lng:126.9847},
+      {name:'Gahoe-dong 31 Viewpoint',meta:'Bukchon 8 Views · GPS',mission:'📸 Photo: Layered rooftops & skyline',icon:'📸',walkMin:7,pts:100,status:'next',lat:37.5826,lng:126.9847},
+      {name:'Bukchon Craft Alley',meta:'Knot, dye & liquor studios · GPS',mission:'👆 Touch: Tie a traditional maedeup knot',icon:'🧵',walkMin:8,pts:80,status:'next',lat:37.5810,lng:126.9850},
+      {name:'Samcheong-dong',meta:'Café & gallery street · GPS',mission:'📳 Shake: Discover a hidden gallery',icon:'☕',walkMin:9,pts:80,status:'next',lat:37.5850,lng:126.9820},
+    ]
   }
 ];
 
@@ -2763,37 +2811,55 @@ function initMap(){
 }
 
 /* ── PROGRAM ↔ SPOT MATCHING & MAP FILTER ── */
-// Resolve which SPOTS belong to a tour program (by explicit spotIds, else by step name match).
+// Resolve a tour program's stops as {lat,lng,name,id?} points.
+// Priority: explicit spotIds → step name match against SPOTS → step's own lat/lng.
+// Never falls back to "all spots" — that caused unrelated cities to appear on the route.
 function getProgramSpotList(tp){
   if(!tp)return SPOTS.slice();
-  let list=[];
+  // 1) explicit spotIds
   if(tp.spotIds&&tp.spotIds.length){
-    list=tp.spotIds.map(id=>SPOTS.find(s=>s.id===id)).filter(Boolean);
+    const byId=tp.spotIds.map(id=>SPOTS.find(s=>s.id===id)).filter(Boolean);
+    if(byId.length)return byId;
   }
-  if(!list.length&&tp.steps){
+  // 2) steps — match to a known SPOT by name, else use the step's own coordinates
+  if(tp.steps&&tp.steps.length){
     const norm=x=>(x||'').toLowerCase();
-    tp.steps.forEach(st=>{
+    const list=[];
+    tp.steps.forEach((st,i)=>{
       const match=SPOTS.find(s=>norm(s.name)===norm(st.name))
         ||SPOTS.find(s=>norm(s.name).includes(norm(st.name))||norm(st.name).includes(norm(s.name)));
-      if(match&&!list.includes(match))list.push(match);
+      if(match){if(!list.some(x=>x.id===match.id))list.push(match);}
+      else if(st.lat&&st.lng){
+        // synthetic stop carrying the step's own coordinates (no matching SPOT marker)
+        list.push({id:tp.id+'-step-'+i,name:st.name,lat:st.lat,lng:st.lng,emoji:st.icon||'📍',cat:'outdoor',synthetic:true});
+      }
     });
+    if(list.length)return list;
   }
-  return list.length?list:SPOTS.slice();
+  return SPOTS.slice();
 }
 function applyMapFilter(){
   if(!map)return;
   const progSpots=activeProgram?getProgramSpotList(activeProgram):null;
-  const ids=progSpots?new Set(progSpots.map(s=>s.id)):null;
+  const realIds=progSpots?new Set(progSpots.filter(s=>!s.synthetic).map(s=>s.id)):null;
+  // show/hide the real SPOT markers
   Object.keys(spotMarkers).forEach(id=>{
     const mk=spotMarkers[id];
-    const show=!ids||ids.has(Number(id));
+    const show=!realIds||realIds.has(Number(id));
     if(show){if(!map.hasLayer(mk))mk.addTo(map);}
     else{if(map.hasLayer(mk))map.removeLayer(mk);}
   });
-  // clear previous program overlay layers
+  // clear previous program overlay layers (polyline + synthetic markers)
   programLayers.forEach(l=>{if(map.hasLayer(l))map.removeLayer(l);});
   programLayers=[];
   if(activeProgram&&progSpots){
+    // draw synthetic markers for stops that have no matching SPOT marker
+    progSpots.filter(s=>s.synthetic&&s.lat&&s.lng).forEach(s=>{
+      const icon=L.divIcon({className:'',html:`<div class="lf-mk ${s.cat||'outdoor'}">${s.emoji||'📍'}</div>`,iconSize:[44,44],iconAnchor:[22,22]});
+      const mk=L.marker([s.lat,s.lng],{icon}).addTo(map);
+      mk.bindPopup(`<div style="padding:14px"><div style="font-size:15px;font-weight:700;color:#fff">${s.name}</div></div>`,{maxWidth:220,className:'lf-popup'});
+      programLayers.push(mk);
+    });
     const pts=progSpots.filter(s=>s.lat&&s.lng).map(s=>[s.lat,s.lng]);
     if(pts.length>1){
       const pl=L.polyline(pts,{color:activeProgram.color||'#FF9D4D',weight:2.5,opacity:.6,dashArray:'8,6'}).addTo(map);
